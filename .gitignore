@@ -1,0 +1,10 @@
+*.orig
+*~
+*.py[co]
+\#*
+\.\#*
+build
+*.so
+build-arch*
+
+
