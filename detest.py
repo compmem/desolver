@@ -29,7 +29,7 @@ if __name__ == '__main__':
     # diffScale, crossoverProb, cutoffEnergy,
     # useClassRandomNumberMethods, polishTheBestTrials
     tStart = time.time()
-    solver = desolve.DESolver([(-100,100)]*3, 600, 600,
+    solver = desolve.DESolver([(-100,100)]*3, 30, 600,
                         "Rand2Exp",
                  err_func, args=None, scale=0.7, crossover_prob=0.6,
                  goal_val=.01, polish=True)
