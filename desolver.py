@@ -125,9 +125,11 @@ class DESolver:
             # eval the initial population
             self._eval_population(job_server)
 
-            # set the best
-            self.best_error = self.population_errors.min()
-            self.best_individual = numpy.copy(self.population[self.population_errors.argmin(),:])
+            # set the index of the best individual
+            best_ind = self.population_errors.argmin()
+            self.best_error = self.population_errors[best_ind]
+            self.best_individual = numpy.copy(self.population[best_ind,:])
+            self.best_generation = self.generation
 
             # now solve
             self._solve(job_server)
@@ -284,10 +286,13 @@ class DESolver:
             best_ind = self.population_errors.argmin()
 
             # update what is best
-            self.best_error = self.population_errors[best_ind]
-            self.best_individual = numpy.copy(self.population[best_ind,:])
+            if self.population_errors[best_ind] < self.best_error:
+                self.best_error = self.population_errors[best_ind]
+                self.best_individual = numpy.copy(self.population[best_ind,:])
+                self.best_generation = self.generation
 
             if self.verbose:
+                print "Best generation: %g" % (self.best_generation)
                 print "Best Error: %g" % (self.best_error)
                 print "Best Indiv: " + str(self.best_individual)
                 print
@@ -318,7 +323,7 @@ class DESolver:
                 # update what is best
                 self.best_error = self.population_errors[best_ind]
                 self.best_individual = numpy.copy(self.population[best_ind,:])
-
+                
 
         if job_server:
             self.pp_stats = job_server.get_stats()
