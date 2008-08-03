@@ -93,6 +93,9 @@ class DESolver:
             # single-CPU systems)
             job_server = pp.Server()
 
+            if self.verbose:
+                print "Setting up %d pp_cpus" % (job_server.get_ncpus())
+
             # set up lists of depfuncs and modules
             depfuncs = []
             if not pp_depfuncs is None:
@@ -282,6 +285,9 @@ class DESolver:
 
             # see if polish with fmin search after the first generation
             if self.polish and self.generation>0:
+                if self.verbose:
+                    print "Polishing best result: %g" % (self.population_errors[best_ind])
+
                 # polish with bounded min search
                 polished_individual, polished_error, details = \
                                      scipy.optimize.fmin_l_bfgs_b(self.error_func,
@@ -289,6 +295,8 @@ class DESolver:
                                                                   args=self.args,
                                                                   bounds=self.param_ranges,
                                                                   approx_grad=True)
+                if verbose:
+                    print "Polished Result: %g" % (polished_error)
                 if polished_error < self.population_errors[best_ind]:
                     # it's better, so keep it
                     self.population[best_ind,:] = polished_individual
