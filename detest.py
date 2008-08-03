@@ -38,11 +38,12 @@ if __name__ == '__main__':
 
     #solver = desolver.DESolver([(-100,100)]*3, 30, 600,
     solver = MySolve([(-100,100)]*3, 30, 600,
-                     method = desolver.DE_RAND_1,
+                     method = desolver.DE_BEST_1,
                      args=[xData,yData], scale=0.7, crossover_prob=0.6,
-                     goal_error=.01, polish=True, verbose=False,
+                     goal_error=.01, polish=False, verbose=False,
                      use_pp = True, pp_modules=['numpy'])
     tElapsed = time.time() - tStart
+    print "Best generation:", solver.best_generation
     print "Best individual:", solver.best_individual
     print "Best error:", solver.best_error, \
           ": Elapsed time", tElapsed, \

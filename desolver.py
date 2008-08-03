@@ -25,7 +25,8 @@ except ImportError:
 DE_RAND_1 = 0
 DE_BEST_1 = 1
 DE_BEST_2 = 2
-
+DE_BEST_1_JITTER = 3
+DE_LOCAL_TO_BEST_1 = 4
 
 # Functions to set up and control remote worker
 def _update_solver(in_solver):
@@ -225,12 +226,29 @@ class DESolver:
         if self.method == DE_RAND_1:
             population = pop3 + self.scale*(pop1 - pop2)
             population_orig = pop3
+        # DE/BEST/1
+        if self.method == DE_BEST_1:
+            population = best_population + self.scale*(pop1 - pop2)
+            population_orig = best_population
         # DE/best/2
         elif self.method == DE_BEST_2:
             population = best_population + self.scale * \
                          (pop1 + pop2 - pop3 - pop4)
             population_orig = best_population
-        
+        # DE/BEST/1/JITTER
+        elif self.method == DE_BEST_1_JITTER:
+            population = best_population + (pop1 - pop2) * \
+                         ((1.0-0.9999) * \
+                          numpy.random.rand(self.population_size,self.num_params) + \
+                          self.scale)
+            population_orig = best_population
+        # DE/LOCAL_TO_BEST/1
+        elif self.method == DE_LOCAL_TO_BEST_1:
+            population = self.old_population + \
+                         self.scale*(best_population - self.old_population) + \
+                         self.scale*(pop1 - pop2)
+            population_orig = self.old_population
+            
         # crossover
         population[xold_ind] = self.old_population[xold_ind]
 
