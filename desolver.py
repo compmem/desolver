@@ -3,6 +3,7 @@
 #
 
 import numpy
+import scipy.optimize
 
 # http;//www.parallelpython.com -
 # can be single CPU, multi-core SMP, or cluster parallelization
@@ -19,27 +20,21 @@ except ImportError:
 # except ImportError:
 #     pass #print "psyco not loaded"
 
+# set up the enumerated DE method types
+DE_RAND_1 = 0
+DE_BEST_1 = 1
+DE_BEST_2 = 2
+
 
 # Functions to set up and control remote worker
-def _make_global_solver(in_solver):
-    global solver    
-    solver = in_solver
-
 def _update_solver(in_solver):
     global solver
-    ## solver.pop = in_solver.pop
-    ## solver.best_val = in_solver.best_val
-    ## solver.best_ind = in_solver.best_ind
-    ## solver.gen = in_solver.gen
-    solver.pop = in_solver.pop
-    solver.best_val = in_solver.best_val
-    solver.best_ind = in_solver.best_ind
-    solver.gen = in_solver.gen
-
+    solver = in_solver
+    
 def _call_error_func(ind):
     global solver
-    val = solver.error_func(solver.pop[ind,:],*(solver.args))
-    return[ind,val]
+    error = solver.error_func(solver.population[ind,:],*(solver.args))
+    return[ind,error]
 
 
 class DESolver:
@@ -47,17 +42,18 @@ class DESolver:
     Genetic minimization based on Differential Evolution.
     """
 
-    def __init__(self, param_ranges, pop_size, max_gen, method,
+    def __init__(self, param_ranges, population_size, max_generation,
+                 method = DE_RAND_1,
                  args=None, scale=0.8, crossover_prob=0.9,
-                 goal_val=1e-3, polish=True, use_pp=True,
-                 pp_depfuncs=(), pp_modules=()):
+                 goal_error=1e-3, polish=True, use_pp=True,
+                 pp_depfuncs=None, pp_modules=None):
         """
         """
         # set the internal vars
         self.param_ranges = param_ranges
         self.num_params = len(self.param_ranges)
-        self.pop_size = pop_size
-        self.max_gen = max_gen
+        self.population_size = population_size
+        self.max_generation = max_generation
         self.method = method
         #self.func = func
         # prepend self to the args
@@ -68,21 +64,21 @@ class DESolver:
         self.args = args
         self.scale = scale
         self.crossover_prob = crossover_prob
-        self.goal_val = goal_val
+        self.goal_error = goal_error
         self.polish = polish
 
         # set helper vars
-        self.rot_ind = numpy.arange(self.pop_size)
+        self.rot_ind = numpy.arange(self.population_size)
 
         # set status vars
-        self.gen = -1
+        self.generation = -1
 
         # set up the population
         # eventually we can allow for unbounded min/max values with None
-        self.pop = numpy.hstack([numpy.random.uniform(p[0],p[1],
-                                                size=[self.pop_size,1])
+        self.population = numpy.hstack([numpy.random.uniform(p[0],p[1],
+                                                size=[self.population_size,1])
                               for p in param_ranges])
-        self.pop_vals = numpy.empty(len(self.pop))
+        self.population_errors = numpy.empty(len(self.population))
 
         # check for pp
         if use_pp and not HAS_PP:
@@ -95,12 +91,22 @@ class DESolver:
             # single-CPU systems)
             job_server = pp.Server()
 
-            # give each worker a copy of this object
+            # set up lists of depfuncs and modules
+            depfuncs = []
+            if not pp_depfuncs is None:
+                depfuncs.extend(pp_depfuncs)
+            depfuncs = tuple(depfuncs)
+            modules = ['desolver']
+            if not pp_modules is None:
+                modules.extend(pp_modules)
+            modules = tuple(modules)
+
+            # give each worker a copy of this object and the required
+            # depfuncs and modules
             for i in range(job_server.get_ncpus()):
-                #job_server.submit(_update_solver,
-                job_server.submit(_make_global_solver,
-                                  args=(self,), depfuncs=(),
-                                  modules=('desolver','numpy'))
+                job_server.submit(_update_solver,
+                                  args=(self,), depfuncs=depfuncs,
+                                  modules=modules)
             job_server.wait()
 
         else:
@@ -112,11 +118,11 @@ class DESolver:
         # killed if they were started
         try:
             # eval the initial population
-            self._eval_pop()
+            self._eval_population()
 
             # set the best
-            self.best_val = self.pop_vals.min()
-            self.best_ind = numpy.copy(self.pop[self.pop_vals.argmin(),:])
+            self.best_error = self.population_errors.min()
+            self.best_individual = numpy.copy(self.population[self.population_errors.argmin(),:])
 
             # now solve
             self._solve(job_server)
@@ -126,17 +132,17 @@ class DESolver:
                 job_server.destroy()
 
 
-    def _eval_pop(self, job_server=None):
+    def _eval_population(self, job_server=None):
         """
-        Evals the provided population, returning the vals from the
+        Evals the provided population, returning the errors from the
         function.
         """
         # see if use job_server
         if not job_server:
             # eval the function for the initial population
-            for i in xrange(len(self.pop)):
-                #self.pop_vals[i] = self.func(self.pop[i,:],*(self.args))
-                self.pop_vals[i] = self.error_func(self.pop[i,:],*(self.args))
+            for i in xrange(len(self.population)):
+                #self.population_errors[i] = self.func(self.population[i,:],*(self.args))
+                self.population_errors[i] = self.error_func(self.population[i,:],*(self.args))
         else:
             # update the workers
             for i in range(job_server.get_ncpus()):
@@ -145,62 +151,68 @@ class DESolver:
 
             # submit the functions to the job server
             jobs = []
-            for i in xrange(len(self.pop)):
+            for i in xrange(len(self.population)):
                 jobs.append(job_server.submit(_call_error_func, (i,), (), ()))
             for job in jobs:
-                i,val = job()
-                self.pop_vals[i] = val
-                #self.pop_vals[i] = job()
+                i,error = job()
+                self.population_errors[i] = error
+                #self.population_errors[i] = job()
 
     def error_func(self, indiv, *args):
         raise NotImplementedError 
 
-    def _evolve_pop(self):
+    def _evolve_population(self):
         """
         Evolove to new generation of population.
         """
-        # save the old pop
-        self.pop_old = self.pop.copy()
-        self.pop_old_vals = self.pop_vals.copy()
+        # save the old population
+        self.old_population = self.population.copy()
+        self.old_population_errors = self.population_errors.copy()
 
         # index pointers
         rind = numpy.random.permutation(4)+1
 
         # shuffle the locations of the individuals
-        ind1 = numpy.random.permutation(self.pop_size)
-        pop1 = self.pop_old[ind1,:]
+        ind1 = numpy.random.permutation(self.population_size)
+        pop1 = self.old_population[ind1,:]
         
         # rotate for remaining indices
-        rot = numpy.remainder(self.rot_ind + rind[0], self.pop_size)
+        rot = numpy.remainder(self.rot_ind + rind[0], self.population_size)
         ind2 = ind1[rot,:]
-        pop2 = self.pop_old[ind2,:]
+        pop2 = self.old_population[ind2,:]
 
-        rot = numpy.remainder(self.rot_ind + rind[1], self.pop_size)
+        rot = numpy.remainder(self.rot_ind + rind[1], self.population_size)
         ind3 = ind2[rot,:]
-        pop3 = self.pop_old[ind3,:]
+        pop3 = self.old_population[ind3,:]
 
-        rot = numpy.remainder(self.rot_ind + rind[2], self.pop_size)
+        rot = numpy.remainder(self.rot_ind + rind[2], self.population_size)
         ind4 = ind3[rot,:]
-        pop4 = self.pop_old[ind4,:]
+        pop4 = self.old_population[ind4,:]
 
-        rot = numpy.remainder(self.rot_ind + rind[3], self.pop_size)
+        rot = numpy.remainder(self.rot_ind + rind[3], self.population_size)
         ind5 = ind4[rot,:]
-        pop5 = self.pop_old[ind5,:]
+        pop5 = self.old_population[ind5,:]
         
-        # pop filled with best individual
-        pop_best = self.best_ind[numpy.newaxis,:].repeat(self.pop_size,axis=0)
+        # population filled with best individual
+        best_population = self.best_individual[numpy.newaxis,:].repeat(self.population_size,axis=0)
 
         # figure out the crossover ind
-        xold_ind = numpy.random.rand(self.pop_size,self.num_params) >= \
+        xold_ind = numpy.random.rand(self.population_size,self.num_params) >= \
             self.crossover_prob
 
-        # get new pop based on desired strategy
+        # get new population based on desired strategy
         # DE/rand/1
-        pop = pop3 + self.scale*(pop1 - pop2)
-        pop_orig = pop3
-
+        if self.method == DE_RAND_1:
+            population = pop3 + self.scale*(pop1 - pop2)
+            population_orig = pop3
+        # DE/best/2
+        elif self.method == DE_BEST_2:
+            population = best_population + self.scale * \
+                         (pop1 + pop2 - pop3 - pop4)
+            population_orig = best_population
+        
         # crossover
-        pop[xold_ind] = self.pop_old[xold_ind]
+        population[xold_ind] = self.old_population[xold_ind]
 
         # apply the boundary constraints
         for p in xrange(self.num_params):
@@ -209,20 +221,24 @@ class DESolver:
             max_val = self.param_ranges[p][1]
 
             # find where exceeded max
-            ind = pop[:,p] > max_val
+            ind = population[:,p] > max_val
             if ind.sum() > 0:
                 # bounce back
-                pop[ind,p] = max_val + numpy.random.rand(ind.sum())*(pop_orig[ind,p]-max_val)
+                population[ind,p] = max_val + \
+                                    numpy.random.rand(ind.sum())*\
+                                    (population_orig[ind,p]-max_val)
 
             # find where below min
-            ind = pop[:,p] < min_val
+            ind = population[:,p] < min_val
             if ind.sum() > 0:
                 # bounce back
-                pop[ind,p] = min_val + numpy.random.rand(ind.sum())*(pop_orig[ind,p]-min_val)
+                population[ind,p] = min_val + \
+                                    numpy.random.rand(ind.sum())*\
+                                    (population_orig[ind,p]-min_val)
 
         # set the class members
-        self.pop = pop
-        self.pop_orig = pop
+        self.population = population
+        self.population_orig = population
 
     
     def _solve(self, job_server=None):
@@ -231,25 +247,45 @@ class DESolver:
         """
 
         # loop over generations
-        for g in xrange(self.max_gen):
+        for g in xrange(self.max_generation):
             # set the generation
-            self.gen = g
+            self.generation = g
 
             # update the population
-            self._evolve_pop()
+            self._evolve_population()
             
             # evaluate the population
-            self._eval_pop(job_server)
+            self._eval_population(job_server)
 
             # decide what stays
-            ind = self.pop_vals > self.pop_old_vals
-            self.pop[ind,:] = self.pop_old[ind,:]
-            self.pop_vals[ind] = self.pop_old_vals[ind]
+            ind = self.population_errors > self.old_population_errors
+            self.population[ind,:] = self.old_population[ind,:]
+            self.population_errors[ind] = self.old_population_errors[ind]
 
+            # set the index of the best individual
+            best_ind = self.population_errors.argmin()
+
+            # see if polish with fmin search after the first generation
+            if self.polish and self.generation>0:
+                # polish with bounded min search
+                polished_individual, polished_error, details = \
+                                     scipy.optimize.fmin_l_bfgs_b(self.error_func,
+                                                                  self.population[best_ind,:],
+                                                                  args=self.args,
+                                                                  bounds=self.param_ranges,
+                                                                  approx_grad=True)
+                if polished_error < self.population_errors[best_ind]:
+                    # it's better, so keep it
+                    self.population[best_ind,:] = polished_individual
+                    self.population_errors[best_ind] = polished_error
+                
             # update what is best
-            self.best_val = self.pop_vals.min()
-            self.best_ind = numpy.copy(self.pop[self.pop_vals.argmin(),:])
+            self.best_error = self.population_errors[best_ind]
+            self.best_individual = numpy.copy(self.population[best_ind,:])
 
             # see if done
-            if self.best_val < self.goal_val:
+            if self.best_error < self.goal_error:
                 break
+
+        if job_server:
+            self.pp_stats = job_server.get_stats()
