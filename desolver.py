@@ -123,7 +123,7 @@ class DESolver:
         # killed if they were started
         try:
             # eval the initial population
-            self._eval_population()
+            self._eval_population(job_server)
 
             # set the best
             self.best_error = self.population_errors.min()
@@ -265,7 +265,7 @@ class DESolver:
         """
 
         # loop over generations
-        for g in xrange(self.max_generations):
+        for g in xrange(1,self.max_generations):
             # set the generation
             self.generation = g
 
@@ -283,25 +283,6 @@ class DESolver:
             # set the index of the best individual
             best_ind = self.population_errors.argmin()
 
-            # see if polish with fmin search after the first generation
-            if self.polish and self.generation>0:
-                if self.verbose:
-                    print "Polishing best result: %g" % (self.population_errors[best_ind])
-
-                # polish with bounded min search
-                polished_individual, polished_error, details = \
-                                     scipy.optimize.fmin_l_bfgs_b(self.error_func,
-                                                                  self.population[best_ind,:],
-                                                                  args=self.args,
-                                                                  bounds=self.param_ranges,
-                                                                  approx_grad=True)
-                if verbose:
-                    print "Polished Result: %g" % (polished_error)
-                if polished_error < self.population_errors[best_ind]:
-                    # it's better, so keep it
-                    self.population[best_ind,:] = polished_individual
-                    self.population_errors[best_ind] = polished_error
-                
             # update what is best
             self.best_error = self.population_errors[best_ind]
             self.best_individual = numpy.copy(self.population[best_ind,:])
@@ -314,6 +295,30 @@ class DESolver:
             # see if done
             if self.best_error < self.goal_error:
                 break
+
+        # see if polish with fmin search after the first generation
+        if self.polish:
+            if self.verbose:
+                print "Polishing best result: %g" % (self.population_errors[best_ind])
+
+            # polish with bounded min search
+            polished_individual, polished_error, details = \
+                                 scipy.optimize.fmin_l_bfgs_b(self.error_func,
+                                                              self.population[best_ind,:],
+                                                              args=self.args,
+                                                              bounds=self.param_ranges,
+                                                              approx_grad=True)
+            if self.verbose:
+                print "Polished Result: %g" % (polished_error)
+            if polished_error < self.population_errors[best_ind]:
+                # it's better, so keep it
+                self.population[best_ind,:] = polished_individual
+                self.population_errors[best_ind] = polished_error
+
+                # update what is best
+                self.best_error = self.population_errors[best_ind]
+                self.best_individual = numpy.copy(self.population[best_ind,:])
+
 
         if job_server:
             self.pp_stats = job_server.get_stats()
