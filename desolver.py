@@ -4,6 +4,7 @@
 
 import numpy
 import scipy.optimize
+import sys
 
 # http;//www.parallelpython.com -
 # can be single CPU, multi-core SMP, or cluster parallelization
@@ -34,7 +35,7 @@ def _update_solver(in_solver):
 def _call_error_func(ind):
     global solver
     error = solver.error_func(solver.population[ind,:],*(solver.args))
-    return[ind,error]
+    return error
 
 
 class DESolver:
@@ -42,18 +43,18 @@ class DESolver:
     Genetic minimization based on Differential Evolution.
     """
 
-    def __init__(self, param_ranges, population_size, max_generation,
+    def __init__(self, param_ranges, population_size, max_generations,
                  method = DE_RAND_1,
                  args=None, scale=0.8, crossover_prob=0.9,
-                 goal_error=1e-3, polish=True, use_pp=True,
-                 pp_depfuncs=None, pp_modules=None):
+                 goal_error=1e-3, polish=True, verbose=True,
+                 use_pp=True, pp_depfuncs=None, pp_modules=None):
         """
         """
         # set the internal vars
         self.param_ranges = param_ranges
         self.num_params = len(self.param_ranges)
         self.population_size = population_size
-        self.max_generation = max_generation
+        self.max_generations = max_generations
         self.method = method
         #self.func = func
         # prepend self to the args
@@ -66,19 +67,20 @@ class DESolver:
         self.crossover_prob = crossover_prob
         self.goal_error = goal_error
         self.polish = polish
+        self.verbose = verbose
 
         # set helper vars
         self.rot_ind = numpy.arange(self.population_size)
 
         # set status vars
-        self.generation = -1
+        self.generation = 0
 
         # set up the population
         # eventually we can allow for unbounded min/max values with None
         self.population = numpy.hstack([numpy.random.uniform(p[0],p[1],
                                                 size=[self.population_size,1])
                               for p in param_ranges])
-        self.population_errors = numpy.empty(len(self.population))
+        self.population_errors = numpy.empty(self.population_size)
 
         # check for pp
         if use_pp and not HAS_PP:
@@ -138,9 +140,15 @@ class DESolver:
         function.
         """
         # see if use job_server
+        if self.verbose:
+            print "Generation: %d (%d)" % (self.generation,self.max_generations)
+            sys.stdout.write('Evaluating population (%d): ' % (self.population_size))
         if not job_server:
             # eval the function for the initial population
-            for i in xrange(len(self.population)):
+            for i in xrange(self.population_size):
+                if self.verbose:
+                    sys.stdout.write('%d ' % (i))
+                    sys.stdout.flush()
                 #self.population_errors[i] = self.func(self.population[i,:],*(self.args))
                 self.population_errors[i] = self.error_func(self.population[i,:],*(self.args))
         else:
@@ -151,12 +159,19 @@ class DESolver:
 
             # submit the functions to the job server
             jobs = []
-            for i in xrange(len(self.population)):
+            for i in xrange(self.population_size):
                 jobs.append(job_server.submit(_call_error_func, (i,), (), ()))
-            for job in jobs:
-                i,error = job()
+            for i,job in enumerate(jobs):
+                if self.verbose:
+                    sys.stdout.write('%d ' % (i))
+                    sys.stdout.flush()
+                error = job()
                 self.population_errors[i] = error
                 #self.population_errors[i] = job()
+
+        if self.verbose:
+            sys.stdout.write('\n')
+            sys.stdout.flush()
 
     def error_func(self, indiv, *args):
         raise NotImplementedError 
@@ -247,7 +262,7 @@ class DESolver:
         """
 
         # loop over generations
-        for g in xrange(self.max_generation):
+        for g in xrange(self.max_generations):
             # set the generation
             self.generation = g
 
@@ -283,6 +298,11 @@ class DESolver:
             self.best_error = self.population_errors[best_ind]
             self.best_individual = numpy.copy(self.population[best_ind,:])
 
+            if self.verbose:
+                print "Best Error: %g" % (self.best_error)
+                print "Best Indiv: " + str(self.best_individual)
+                print
+            
             # see if done
             if self.best_error < self.goal_error:
                 break
