@@ -39,7 +39,7 @@ def _call_error_func(ind):
     return error
 
 
-class DESolver:
+class DESolver(object):
     """
     Genetic minimization based on Differential Evolution.
     """
@@ -333,6 +333,7 @@ class DESolver:
                                                               approx_grad=True)
             if self.verbose:
                 print "Polished Result: %g" % (polished_error)
+                print "Polished Indiv: " + str(polished_individual)
             if polished_error < self.population_errors[best_ind]:
                 # it's better, so keep it
                 self.population[best_ind,:] = polished_individual
