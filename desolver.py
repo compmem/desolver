@@ -45,8 +45,8 @@ class DESolver(object):
     """
 
     def __init__(self, param_ranges, population_size, max_generations,
-                 method = DE_RAND_1,
-                 args=None, scale=0.8, crossover_prob=0.9,
+                 method = DE_RAND_1, args=None,
+                 scale=0.8, crossover_prob=0.9,
                  goal_error=1e-3, polish=True, verbose=True,
                  use_pp=True, pp_depfuncs=None, pp_modules=None):
         """
@@ -132,6 +132,12 @@ class DESolver(object):
             self.best_individual = numpy.copy(self.population[best_ind,:])
             self.best_generation = self.generation
 
+            if self.verbose:
+                print "Best generation: %g" % (self.best_generation)
+                print "Best Error: %g" % (self.best_error)
+                print "Best Indiv: " + str(self.best_individual)
+                print
+            
             # now solve
             self._solve(job_server)
         finally:
