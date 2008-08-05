@@ -329,14 +329,17 @@ class DESolver(object):
         if self.polish:
             if self.verbose:
                 print "Polishing best result: %g" % (self.population_errors[best_ind])
-
+                iprint = 1
+            else:
+                iprint = -1
             # polish with bounded min search
             polished_individual, polished_error, details = \
                                  scipy.optimize.fmin_l_bfgs_b(self.error_func,
                                                               self.population[best_ind,:],
                                                               args=self.args,
                                                               bounds=self.param_ranges,
-                                                              approx_grad=True)
+                                                              approx_grad=True,
+                                                              iprint=iprint)
             if self.verbose:
                 print "Polished Result: %g" % (polished_error)
                 print "Polished Indiv: " + str(polished_individual)
