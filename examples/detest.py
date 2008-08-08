@@ -17,11 +17,11 @@ class MySolve(desolver.DESolver):
     def error_func(self, indiv, *args):
         # inverse exponential with offset, y = a * exp(b/x) + c
         #predicted = indiv[0] * numpy.exp(indiv[1] / self.xData) + indiv[2]
-        predicted = indiv[0] * numpy.exp(indiv[1] / args[1]) + indiv[2]
+        predicted = indiv[0] * numpy.exp(indiv[1] / args[0]) + indiv[2]
 
         # sum of squared error
         #error = predicted - self.yData
-        error = predicted - args[2]
+        error = predicted - args[1]
         return numpy.sum(error*error)
 
 

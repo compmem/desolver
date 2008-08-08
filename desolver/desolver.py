@@ -60,9 +60,7 @@ class DESolver(object):
         #self.func = func
         # prepend self to the args
         if args is None:
-            args = [self]
-        else:
-            args.insert(0,self)
+            args = ()
         self.args = args
         self.scale = scale
         self.crossover_prob = crossover_prob

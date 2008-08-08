@@ -6,5 +6,6 @@
 build
 *.so
 build-arch*
+examples/iterate.dat
 
 
