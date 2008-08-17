@@ -4,6 +4,7 @@
 
 import numpy
 import time
+import cPickle
 
 import desolver
 
@@ -49,3 +50,5 @@ if __name__ == '__main__':
           ": Elapsed time", tElapsed, \
           'seconds for', solver.generation+1, 'generation(s)'
     print tElapsed / (solver.generation+1), 'seconds per generation.'
+
+    #cPickle.dump(solver,open('desolver.pickle','wb'),2)
