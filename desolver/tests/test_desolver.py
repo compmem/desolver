@@ -2,6 +2,7 @@
 
 import desolver
 import numpy
+import pickle
 
 class MySolver(desolver.DESolver):
     def error_func(self, indiv, *args):
@@ -28,3 +29,16 @@ class TestDesolver():
                           use_pp = False, pp_modules=['numpy'])
 
         assert(solver.best_error <= .01)
+
+    def test_pickle(self):
+        # run the example solver
+        solver = MySolver([(-100,100)]*3, 30, 600,
+                          method = desolver.DE_RAND_1,
+                          args=[self.xData,self.yData], scale=0.8, crossover_prob=0.9,
+                          goal_error=.01, polish=False, verbose=False,
+                          use_pp = False, pp_modules=['numpy'])
+        # pickle and unpickle it
+        pstr = pickle.dumps(solver)
+        solver2 = pickle.loads(pstr)
+
+        # verify that we can access the data
