@@ -157,17 +157,24 @@ class DESolver(object):
             self.best_generation = self.generation
 
             if self.verbose:
-                print "Best generation: %g" % (self.best_generation)
-                print "Best Error: %g" % (self.best_error)
-                print "Best Indiv: " + str(self.best_individual)
-                print
-            
+                self._report_best()
+
             # now solve
             self._solve(job_server)
         finally:
             # destroy the server if it was started
             if use_pp:
                 job_server.destroy()
+
+    def _report_best(self):
+        print "Best generation: %g" % (self.best_generation)
+        print "Best Error: %g" % (self.best_error)
+        #print "Best Indiv: " + str(self.best_individual)
+        best_indiv = ', '.join(["'%s': %f" % (name,val) \
+                          for name,val \
+                          in zip(self.param_names,self.best_individual)])
+        print "Best Indiv: " + '{'+best_indiv+'}'
+        print
 
 
     def _eval_population(self, job_server=None):
@@ -340,15 +347,8 @@ class DESolver(object):
                 self.best_generation = self.generation
 
             if self.verbose:
-                print "Best generation: %g" % (self.best_generation)
-                print "Best Error: %g" % (self.best_error)
-                #print "Best Indiv: " + str(self.best_individual)
-                best_indiv = ' '.join(['%s: %f; ' % (name,val) \
-                                  for name,val \
-                                  in zip(self.param_names,self.best_individual)])
-                print "Best Indiv: " + best_indiv
-                print
-            
+                self._report_best()
+
             # see if done
             if self.best_error < self.goal_error:
                 break

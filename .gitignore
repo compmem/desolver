@@ -7,4 +7,5 @@ build
 *.so
 build-arch*
 orig
+docs/examples/iterate.dat
 
