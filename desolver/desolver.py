@@ -50,6 +50,9 @@ class DESolver(object):
                  goal_error=1e-3, polish=True, verbose=True,
                  use_pp=True, pp_depfuncs=None, pp_modules=None):
         """
+        Initialize and solve the minimization problem.
+
+        
         """
         # set the internal vars
         self.param_ranges = param_ranges
