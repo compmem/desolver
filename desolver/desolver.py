@@ -42,11 +42,14 @@ def _call_error_func(ind):
 class DESolver(object):
     """
     Genetic minimization based on Differential Evolution.
+
+    See http://www.icsi.berkeley.edu/~storn/code.html
+
     """
 
     def __init__(self, param_ranges, population_size, max_generations,
-                 method = DE_RAND_1, args=None,
-                 scale=0.8, crossover_prob=0.9,
+                 method = DE_RAND_1, args=None, seed=None,
+                 param_names = None, scale=0.8, crossover_prob=0.9,
                  goal_error=1e-3, polish=True, verbose=True,
                  use_pp=True, pp_depfuncs=None, pp_modules=None):
         """
@@ -57,6 +60,10 @@ class DESolver(object):
         # set the internal vars
         self.param_ranges = param_ranges
         self.num_params = len(self.param_ranges)
+        if param_names is None:
+            # generate dummy names
+            param_names = ['p_%d'%(x) for x in range(self.num_params)]
+        self.param_names = param_names
         self.population_size = population_size
         self.max_generations = max_generations
         self.method = method
@@ -77,11 +84,27 @@ class DESolver(object):
         # set status vars
         self.generation = 0
 
+        # set the seed (must be 2D)
+        self.seed = seed
+
         # set up the population
+        if self.seed is None:
+            # we'll be creating an entirely new population
+            num_to_gen = self.population_size
+        else:
+            self.seed = numpy.atleast_2d(self.seed)
+            num_to_gen = self.population_size - len(self.seed)
+
+        # generate random population
         # eventually we can allow for unbounded min/max values with None
-        self.population = numpy.hstack([numpy.random.uniform(p[0],p[1],
-                                                size=[self.population_size,1])
-                              for p in param_ranges])
+        self.population = numpy.hstack( \
+            [numpy.random.uniform(p[0],p[1], size=[self.population_size,1]) \
+                 for p in param_ranges])
+
+        # add in the seed if necessary
+        if not self.seed is None:
+            self.population = numpy.vstack([self.population,seed])
+
         self.population_errors = numpy.empty(self.population_size)
 
         # check for pp
@@ -124,7 +147,7 @@ class DESolver(object):
         # try/finally block is to ensure remote worker processes are
         # killed if they were started
         try:
-            # eval the initial population
+            # eval the initial population to fill errors
             self._eval_population(job_server)
 
             # set the index of the best individual
@@ -319,7 +342,11 @@ class DESolver(object):
             if self.verbose:
                 print "Best generation: %g" % (self.best_generation)
                 print "Best Error: %g" % (self.best_error)
-                print "Best Indiv: " + str(self.best_individual)
+                #print "Best Indiv: " + str(self.best_individual)
+                best_indiv = ' '.join(['%s: %f; ' % (name,val) \
+                                  for name,val \
+                                  in zip(self.param_names,self.best_individual)])
+                print "Best Indiv: " + best_indiv
                 print
             
             # see if done

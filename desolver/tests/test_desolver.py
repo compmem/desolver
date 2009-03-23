@@ -42,3 +42,14 @@ class TestDesolver():
         solver2 = pickle.loads(pstr)
 
         # verify that we can access the data
+
+    def test_seed(self):
+        solver = MySolver([(-100,100)]*3, 30, 600,
+                          method = desolver.DE_RAND_1,
+                          args=[self.xData,self.yData], 
+                          seed = numpy.random.uniform(-1,1,size=(4,3)),
+                          scale=0.8, crossover_prob=0.9,
+                          goal_error=.01, polish=False, verbose=False,
+                          use_pp = False, pp_modules=['numpy'])
+
+        assert(solver.best_error <= .01)
