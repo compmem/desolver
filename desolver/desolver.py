@@ -98,7 +98,7 @@ class DESolver(object):
         # generate random population
         # eventually we can allow for unbounded min/max values with None
         self.population = numpy.hstack( \
-            [numpy.random.uniform(p[0],p[1], size=[self.population_size,1]) \
+            [numpy.random.uniform(p[0],p[1], size=[num_to_gen,1]) \
                  for p in param_ranges])
 
         # add in the seed if necessary
