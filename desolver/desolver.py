@@ -353,7 +353,7 @@ class DESolver(object):
             if self.best_error < self.goal_error:
                 break
 
-        # see if polish with fmin search after the first generation
+        # see if polish with fmin search after the last generation
         if self.polish:
             if self.verbose:
                 print "Polishing best result: %g" % (self.population_errors[best_ind])
@@ -363,7 +363,8 @@ class DESolver(object):
             # polish with bounded min search
             polished_individual, polished_error, details = \
                                  scipy.optimize.fmin_l_bfgs_b(self.error_func,
-                                                              self.population[best_ind,:],
+                                                              #self.population[best_ind,:],
+                                                              self.best_individual,
                                                               args=self.args,
                                                               bounds=self.param_ranges,
                                                               approx_grad=True,
@@ -373,13 +374,15 @@ class DESolver(object):
                 print "Polished Indiv: " + str(polished_individual)
             if polished_error < self.population_errors[best_ind]:
                 # it's better, so keep it
-                self.population[best_ind,:] = polished_individual
-                self.population_errors[best_ind] = polished_error
+                #self.population[best_ind,:] = polished_individual
+                #self.population_errors[best_ind] = polished_error
 
                 # update what is best
-                self.best_error = self.population_errors[best_ind]
-                self.best_individual = numpy.copy(self.population[best_ind,:])
-                
+                #self.best_error = self.population_errors[best_ind]
+                #self.best_individual = numpy.copy(self.population[best_ind,:])
+                self.best_error = polished_error
+                self.best_individual = polished_individual
+                self.best_generation = -1
 
         if job_server:
             self.pp_stats = job_server.get_stats()
