@@ -6,11 +6,11 @@ import os
 import sys
 
 setup(name='desolver', 
-      version=vstr, 
+      version='0.0.1',
       package_dir={"desolver":"desolver"},
       packages=['desolver','desolver.tests'],
       author=['Per B. Sederberg'],
       maintainer=['Per B. Sederberg'],
       maintainer_email=['psederberg@gmail.com'],
-      url=['http://code.google.com/p/desolver/'])
+      url=['http://github.com/psederberg/desolver'])
 
