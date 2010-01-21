@@ -107,6 +107,10 @@ class DESolver(object):
 
         self.population_errors = numpy.empty(self.population_size)
 
+        # save the best error from each generation
+        self.best_gen_errors = numpy.zeros(max_generations)*numpy.nan
+        self.best_gen_indv = numpy.zeros((max_generations,self.num_params))*numpy.nan
+
         # check for pp
         if use_pp and not HAS_PP:
             print "WARNING: PP was not found on your system, so no "\
@@ -156,6 +160,10 @@ class DESolver(object):
             self.best_individual = numpy.copy(self.population[best_ind,:])
             self.best_generation = self.generation
 
+            # save the best for that gen
+            self.best_gen_errors[0] = self.population_errors[best_ind]
+            self.best_gen_indv[0,:] = self.population[best_ind,:]
+
             if self.verbose:
                 self._report_best()
 
@@ -166,14 +174,21 @@ class DESolver(object):
             if use_pp:
                 job_server.destroy()
 
+    def _indv_to_dictstr(self,indv):
+        return '{' + \
+            ', '.join(["'%s': %f" % (name,val) \
+                           for name,val \
+                           in zip(self.param_names,indv)]) + '}'
+
     def _report_best(self):
-        print "Best generation: %g" % (self.best_generation)
-        print "Best Error: %g" % (self.best_error)
+        print "Current generation: %g" % (self.generation)
+        print "Current Best Error: %g" % (self.best_gen_errors[self.generation])
+        print "Current Best Indiv: " + \
+            self._indv_to_dictstr(self.best_gen_indv[self.generation,:])
+        print "Overall Best generation: %g" % (self.best_generation)
+        print "Overall Best Error: %g" % (self.best_error)
         #print "Best Indiv: " + str(self.best_individual)
-        best_indiv = ', '.join(["'%s': %f" % (name,val) \
-                          for name,val \
-                          in zip(self.param_names,self.best_individual)])
-        print "Best Indiv: " + '{'+best_indiv+'}'
+        print "Overall Best Indiv: " + self._indv_to_dictstr(self.best_individual)
         print
 
 
@@ -345,6 +360,10 @@ class DESolver(object):
                 self.best_error = self.population_errors[best_ind]
                 self.best_individual = numpy.copy(self.population[best_ind,:])
                 self.best_generation = self.generation
+
+            # save the best indv for that generation
+            self.best_gen_errors[g] = self.population_errors[best_ind]
+            self.best_gen_indv[g,:] = self.population[best_ind,:]
 
             if self.verbose:
                 self._report_best()
