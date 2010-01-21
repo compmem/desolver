@@ -34,9 +34,13 @@ if __name__ == '__main__':
     solver = MySolve([(-100,100)]*3, 30, 600,
                      #method = desolver.DE_BEST_1,
                      #method = desolver.DE_BEST_1_JITTER,
-                     method = desolver.DE_LOCAL_TO_BEST_1,
-                     args=[xData,yData], scale=0.7, crossover_prob=0.9,
-                     goal_error=.01, polish=True, verbose=True,
+                     #method = desolver.DE_LOCAL_TO_BEST_1,
+                     method = desolver.DE_RAND_1,
+                     args=[xData,yData], 
+                     scale=[0.5,1.0], 
+                     #scale=0.8, 
+                     crossover_prob=0.9,
+                     goal_error=.01, polish=False, verbose=True,
                      use_pp = True, pp_modules=['numpy'])
     tElapsed = time.time() - tStart
     print
