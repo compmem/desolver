@@ -390,7 +390,7 @@ class DESolver(object):
         # see if polish with fmin search after the last generation
         if self.polish:
             if self.verbose:
-                print "Polishing best result: %g" % (self.population_errors[best_ind])
+                print "Polishing best result: %g" % (self.best_error)
                 iprint = 1
             else:
                 iprint = -1
