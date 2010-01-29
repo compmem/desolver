@@ -1,21 +1,14 @@
-#
-#
-#
-
-import numpy
-import time
-import cPickle
-
 import desolver
+import time
+import numpy
 
-def error_func(indiv, *args):
-    # inverse exponential with offset, y = a * exp(b/x) + c
-    predicted = indiv[0] * numpy.exp(indiv[1] / args[0]) + indiv[2]
+import global_fun
 
-    # sum of squared error
-    error = predicted - args[1]
-    return numpy.sum(error*error)
-
+def dep_error_func(indiv, *args):
+    if global_fun.fun is None:
+        print "Called init"
+        global_fun.fun = global_fun.FunToOpt()
+    return global_fun.fun(indiv, *args)
 
 if __name__ == '__main__':
 
@@ -27,7 +20,7 @@ if __name__ == '__main__':
     tStart = time.time()
 
     # set up the solver
-    solver = desolver.DESolver(error_func,
+    solver = desolver.DESolver(dep_error_func,
         [(-100,100)]*3, 30, 600,
                      #method = desolver.DE_BEST_1,
                      #method = desolver.DE_BEST_1_JITTER,
@@ -37,7 +30,8 @@ if __name__ == '__main__':
                      scale=[0.5,1.0], 
                      crossover_prob=0.9,
                      goal_error=.01, polish=False, verbose=True,
-                     use_pp = True, pp_modules=['numpy'])
+                     use_pp = True, pp_modules=['global_fun'],
+                               pp_depfuncs=[])
     tElapsed = time.time() - tStart
     print
     print "Best generation:", solver.best_generation
@@ -47,4 +41,5 @@ if __name__ == '__main__':
           'seconds for', solver.generation+1, 'generation(s)'
     print tElapsed / (solver.generation+1), 'seconds per generation.'
 
-    #cPickle.dump(solver,open('desolver.pickle','wb'),2)
+
+

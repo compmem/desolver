@@ -28,17 +28,6 @@ DE_BEST_2 = 2
 DE_BEST_1_JITTER = 3
 DE_LOCAL_TO_BEST_1 = 4
 
-# Functions to set up and control remote worker
-def _update_solver(in_solver):
-    global solver
-    solver = in_solver
-    
-def _call_error_func(ind):
-    global solver
-    error = solver.error_func(solver.population[ind,:],*(solver.args))
-    return error
-
-
 class DESolver(object):
     """
     Genetic minimization based on Differential Evolution.
@@ -47,17 +36,19 @@ class DESolver(object):
 
     """
 
-    def __init__(self, param_ranges, population_size, max_generations,
+    def __init__(self, error_func, param_ranges, population_size, max_generations,
                  method = DE_RAND_1, args=None, seed=None,
                  param_names = None, scale=[0.5,1.0], crossover_prob=0.9,
                  goal_error=1e-3, polish=True, verbose=True,
-                 use_pp=True, pp_depfuncs=None, pp_modules=None):
+                 use_pp=True, pp_depfuncs=None, pp_modules=None,
+                 pp_proto=2, pp_ncpus='autodetect'):
         """
         Initialize and solve the minimization problem.
 
         
         """
         # set the internal vars
+        #self.error_func = error_func # don't keep b/c can't pickle it
         self.param_ranges = param_ranges
         self.num_params = len(self.param_ranges)
         if param_names is None:
@@ -111,37 +102,29 @@ class DESolver(object):
 
         # check for pp
         if use_pp and not HAS_PP:
-            print "WARNING: PP was not found on your system, so no "\
-                  "parallelization will be performed."
+            print "WARNING: ParallelPython was not found on your system, "\
+                  "so no parallelization will be performed."
             use_pp = False
 
         if use_pp:
             # auto-detects number of SMP CPU cores (will detect 1 core on
             # single-CPU systems)
-            job_server = pp.Server()
+            job_server = pp.Server(proto=pp_proto, ncpus=pp_ncpus)
+            #job_server = pp.Server()
 
-            if self.verbose:
-                print "Setting up %d pp_cpus" % (job_server.get_ncpus())
+            # if self.verbose:
+            #     print "Setting up %d pp_cpus" % (job_server.get_ncpus())
 
             # set up lists of depfuncs and modules
             depfuncs = []
             if not pp_depfuncs is None:
                 depfuncs.extend(pp_depfuncs)
-            depfuncs = tuple(depfuncs)
-            modules = ['desolver']
-            #modules = []
+            self.depfuncs = tuple(depfuncs)
+            #modules = ['desolver']
+            modules = []
             if not pp_modules is None:
                 modules.extend(pp_modules)
-            modules = tuple(modules)
-
-            # give each worker a copy of this object and the required
-            # depfuncs and modules
-            for i in range(job_server.get_ncpus()):
-                job_server.submit(_update_solver,
-                                  args=(self,), 
-                                  depfuncs=depfuncs,
-                                  modules=modules)
-            job_server.wait()
+            self.modules = tuple(modules)
 
         else:
             job_server = None
@@ -152,7 +135,7 @@ class DESolver(object):
         # killed if they were started
         try:
             # eval the initial population to fill errors
-            self._eval_population(job_server)
+            self._eval_population(error_func, job_server=job_server)
 
             # set the index of the best individual
             best_ind = self.population_errors.argmin()
@@ -168,7 +151,7 @@ class DESolver(object):
                 self._report_best()
 
             # now solve
-            self._solve(job_server)
+            self._solve(error_func, job_server=job_server)
         finally:
             # destroy the server if it was started
             if use_pp:
@@ -199,7 +182,8 @@ class DESolver(object):
         else:
             return self.scale
 
-    def _eval_population(self, job_server=None):
+
+    def _eval_population(self, error_func, job_server=None):
         """
         Evals the provided population, returning the errors from the
         function.
@@ -214,24 +198,15 @@ class DESolver(object):
                 if self.verbose:
                     sys.stdout.write('%d ' % (i))
                     sys.stdout.flush()
-                #self.population_errors[i] = self.func(self.population[i,:],*(self.args))
-                self.population_errors[i] = self.error_func(self.population[i,:],*(self.args))
+                self.population_errors[i] = error_func(self.population[i,:],*(self.args))
         else:
-            # update the workers
-            for i in range(job_server.get_ncpus()):
-                job_server.submit(_update_solver, 
-                                  args=(self,), 
-                                  depfuncs=(),
-                                  modules=())
-            job_server.wait()
-
             # submit the functions to the job server
             jobs = []
             for i in xrange(self.population_size):
-                jobs.append(job_server.submit(_call_error_func, 
-                                              args=(i,), 
-                                              depfuncs=(),
-                                              modules=()))
+                jobs.append(job_server.submit(error_func, 
+                                              args=tuple([self.population[i,:]]+self.args),
+                                              depfuncs=self.depfuncs,
+                                              modules=self.modules))
 
             for i,job in enumerate(jobs):
                 if self.verbose:
@@ -239,14 +214,10 @@ class DESolver(object):
                     sys.stdout.flush()
                 error = job()
                 self.population_errors[i] = error
-                #self.population_errors[i] = job()
 
         if self.verbose:
             sys.stdout.write('\n')
             sys.stdout.flush()
-
-    def error_func(self, indiv, *args):
-        raise NotImplementedError 
 
     def _evolve_population(self):
         """
@@ -345,7 +316,7 @@ class DESolver(object):
         self.population_orig = population
 
     
-    def _solve(self, job_server=None):
+    def _solve(self, error_func, job_server=None):
         """
         Optimize the parameters of the function.
         """
@@ -359,7 +330,7 @@ class DESolver(object):
             self._evolve_population()
             
             # evaluate the population
-            self._eval_population(job_server)
+            self._eval_population(error_func, job_server=job_server)
 
             # set the index of the best individual
             best_ind = self.population_errors.argmin()
