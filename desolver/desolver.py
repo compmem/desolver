@@ -10,9 +10,18 @@
 #
 #
 
+# required modules
 import numpy
-import scipy.optimize
 import sys
+
+# optional modules
+
+# scipy for optimization
+try:
+    HAS_SCIPY = True
+    import scipy.optimize
+except ImportError:
+    HAS_SCIPY = False
 
 # http;//www.parallelpython.com -
 # can be single CPU, multi-core SMP, or cluster parallelization
@@ -72,6 +81,10 @@ class DESolver(object):
         self.scale = scale
         self.crossover_prob = crossover_prob
         self.goal_error = goal_error
+        if polish and not HAS_SCIPY:
+            print "WARNING: SciPy was not found on your system, "\
+                  "so no polishing will be performed."
+            polish = False
         self.polish = polish
         self.verbose = verbose
 
@@ -375,8 +388,7 @@ class DESolver(object):
                 iprint = -1
             # polish with bounded min search
             polished_individual, polished_error, details = \
-                                 scipy.optimize.fmin_l_bfgs_b(self.error_func,
-                                                              #self.population[best_ind,:],
+                                 scipy.optimize.fmin_l_bfgs_b(error_func,
                                                               self.best_individual,
                                                               args=self.args,
                                                               bounds=self.param_ranges,
@@ -385,14 +397,9 @@ class DESolver(object):
             if self.verbose:
                 print "Polished Result: %g" % (polished_error)
                 print "Polished Indiv: " + str(polished_individual)
-            if polished_error < self.population_errors[best_ind]:
+            if polished_error < self.best_error:
                 # it's better, so keep it
-                #self.population[best_ind,:] = polished_individual
-                #self.population_errors[best_ind] = polished_error
-
                 # update what is best
-                #self.best_error = self.population_errors[best_ind]
-                #self.best_individual = numpy.copy(self.population[best_ind,:])
                 self.best_error = polished_error
                 self.best_individual = polished_individual
                 self.best_generation = -1
