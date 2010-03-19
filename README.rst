@@ -11,8 +11,10 @@ Overview
 This Python module provides genetic function minimization via
 `differential evolution
 <http://www.icsi.berkeley.edu/~storn/code.html>`_.  The module makes
-use of NumPy and optionally SciPy and Parallel Python to provide
-additional optimization and parallelization support, repectively.
+use of `NumPy <http://numpy.scipy.org/>`_ and optionally `SciPy
+<http://scipy.org/>`_ and `Parallel Python
+<http://www.parallelpython.com/index.php>`_ to provide additional
+optimization and parallelization support, repectively.
 
 
 Installation
